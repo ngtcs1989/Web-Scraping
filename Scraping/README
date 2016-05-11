@@ -1,0 +1,6 @@
+scrapy startproject webcrawling # CREATE PROJECT
+Edit items.py # add items to be captured
+scrapy genspider massEffect tfaw.com  # create spider: massEffect on domain tfaw.com
+Edit the spider_name.py to change the start URL
+scrapy crawl massEffect
+http://www.practicalecommerce.com/articles/90936-Monitor-Competitor-Prices-with-Python-and-Scrapy
