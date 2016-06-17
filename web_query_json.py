@@ -1,38 +1,17 @@
 import json
+import codecs
 import requests
 
-
-BASE_URL = "http://musicbrainz.org/ws/2/"
-ARTIST_URL = BASE_URL + "artist/"
-
-# query parameters are given to the requests.get function as a dictionary; this
-# variable contains some starter parameters.
-query_type = {  "simple": {},
-                "atr": {"inc": "aliases+tags+ratings"},
-                "aliases": {"inc": "aliases"},
-                "releases": {"inc": "releases"}}
+URL_MAIN = "http://api.nytimes.com/svc/"
+URL_POPULAR = URL_MAIN + "mostpopular/v2/"
+API_KEY = { "popular": "",
+            "article": ""}
 
 
-def query_site(url, params, uid="", fmt="json"):
-    # This is the main function for making queries to the musicbrainz API.
-    # A json document should be returned by the query.
-    params["fmt"] = fmt
-    r = requests.get(url + uid, params=params)
-    print url+uid, params
-    print "requesting", r.url
-
-    if r.status_code == requests.codes.ok:
-        return r.json()
-    else:
-        r.raise_for_status()
-
-
-def query_by_name(url, params, name):
-    # This adds an artist name to the query parameters before making
-    # an API call to the function above.
-    params["query"] = "artist:" + name
-    return query_site(url, params)
-
+def get_from_file(kind, period):
+    filename = "popular-{0}-{1}.json".format(kind, period)
+    with open(filename, "r") as f:
+        return json.loads(f.read())
 
 def pretty_print(data, indent=4):
     # After we get our output, we can format it to be more readable
@@ -41,33 +20,79 @@ def pretty_print(data, indent=4):
         print json.dumps(data, indent=indent, sort_keys=True)
     else:
         print data
-
-
-def main():
+        
+def article_overview(kind, period):
+    data = get_from_file(kind, period)
     
-    results = query_by_name(ARTIST_URL, query_type["simple"], "Nirvana")
-    #print len(results["artists"])
-    #lent=0
-    #for i in results["artists"]:
-    #    if i["name"] == "First Aid Kit":
-    #        lent += 1
-    #print lent
-    pretty_print(results)
-    
-    #artist_id = results["artists"][1]["id"]
-    #print "\nARTIST:"
-    #pretty_print(results["artists"][1])
-
-    #artist_data = query_site(ARTIST_URL, query_type["releases"], artist_id)
-    #releases = artist_data["releases"]
-    #print "\nONE RELEASE:"
-    #pretty_print(releases[0], indent=2)
-    #release_titles = [r["title"] for r in releases]
-
-    #print "\nALL TITLES:"
-    #for t in release_titles:
-    #    print t
+    titles = []
+    urls =[]
+    # YOUR CODE HERE
+    for k in data:
+        titles.append({k['section']:k['title']})
+        for media in k['media']:
+            for k in media['media-metadata']:
+                if k['format'] == "Standard Thumbnail":
+                    urls.append(k['url'])
+            
+    #print urls
+    return (titles, urls)
 
 
-if __name__ == '__main__':
-    main()
+def query_site(url, target, offset):
+    # This will set up the query with the API key and offset
+    # Web services often use offset paramter to return data in small chunks
+    # NYTimes returns 20 articles per request, if you want the next 20
+    # You have to provide the offset parameter
+    if API_KEY["popular"] == "" or API_KEY["article"] == "":
+        print "You need to register for NYTimes Developer account to run this program."
+        print "See Intructor notes for information"
+        return False
+    params = {"api-key": API_KEY[target], "offset": offset}
+    r = requests.get(url, params = params)
+
+    if r.status_code == requests.codes.ok:
+        return r.json()
+    else:
+        r.raise_for_status()
+
+
+def get_popular(url, kind, days, section="all-sections", offset=0):
+    # This function will construct the query according to the requirements of the site
+    # and return the data, or print an error message if called incorrectly
+    if days not in [1,7,30]:
+        print "Time period can be 1,7, 30 days only"
+        return False
+    if kind not in ["viewed", "shared", "emailed"]:
+        print "kind can be only one of viewed/shared/emailed"
+        return False
+
+    url += "most{0}/{1}/{2}.json".format(kind, section, days)
+    data = query_site(url, "popular", offset)
+
+    return data
+
+
+def save_file(kind, period):
+    # This will process all results, by calling the API repeatedly with supplied offset value,
+    # combine the data and then write all results in a file.
+    data = get_popular(URL_POPULAR, "viewed", 1)
+    num_results = data["num_results"]
+    full_data = []
+    with codecs.open("popular-{0}-{1}.json".format(kind, period), encoding='utf-8', mode='w') as v:
+        for offset in range(0, num_results, 20):        
+            data = get_popular(URL_POPULAR, kind, period, offset=offset)
+            full_data += data["results"]
+        
+        v.write(json.dumps(full_data, indent=2))
+
+
+def test():
+    titles, urls = article_overview("viewed", 1)
+    assert len(titles) == 20
+    assert len(urls) == 30
+    assert titles[2] == {'Opinion': 'Professors, We Need You!'}
+    assert urls[20] == 'http://graphics8.nytimes.com/images/2014/02/17/sports/ICEDANCE/ICEDANCE-thumbStandard.jpg'
+
+
+if __name__ == "__main__":
+    test()
