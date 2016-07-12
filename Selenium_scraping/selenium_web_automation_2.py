@@ -5,6 +5,7 @@
 
 from selenium import webdriver
 import time
+#reference : http://selenium-python.readthedocs.io/locating-elements.html
 browser=webdriver.Chrome()
 browser.set_window_size(1024,768)
 browser.get('https://leetcode.com/accounts/login/')
